@@ -4,6 +4,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from chats.services.chat_log import ChatLogService
+from chats.services.chatroom_join import ChatRoomJoinService
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -11,20 +12,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
         super().__init__(*args, **kwargs)
         self.chatroom_group = ""
         self.chatlog_service = ChatLogService()
+        self.chat_join_service = ChatRoomJoinService()
+        self.user_id = None
+        self.room_id = None
 
     async def connect(self):
-        title = self.scope["url_route"]["kwargs"]["title"]
-        self.chatroom_group = f"chatroom_{title}"
+        room_id = self.scope["url_route"]["kwargs"]["room_id"]
+        self.chatroom_group = f"chatroom_{room_id}"
+        self.room_id = room_id
 
         await self.channel_layer.group_add(self.chatroom_group, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
+        await self.chat_join_service.async_left_chatroom(self.user_id, self.room_id)
         await self.channel_layer.group_discard(self.chatroom_group, self.channel_name)
 
     async def receive(self, text_data=None, bytes_data=None):
-        text_data_json = json.loads(text_data)
-        if self._is_over_length_message(text_data_json):
+        data = json.loads(text_data)
+        if data["type"] == "auth":
+            await self.set_auth(data)
+            return
+
+        if self._is_over_length_message(data):
             await self.send(
                 text_data=json.dumps(
                     {
@@ -36,10 +46,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         ts = datetime.datetime.now(datetime.UTC).timestamp()
-        await self.chatlog_service.add_message(text_data_json, ts)
+        await self.chatlog_service.add_message(data, ts)
 
-        send_message = dict(**text_data_json, **{"type": "chat_message"})
+        send_message = dict(**data, **{"type": "chat_message"})
         await self.channel_layer.group_send(self.chatroom_group, send_message)
+
+    async def set_auth(self, data: dict):
+        self.user_id = data["user_id"]
 
     async def chat_message(self, event):
         await self.send(

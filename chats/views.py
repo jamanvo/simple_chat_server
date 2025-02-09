@@ -16,13 +16,7 @@ def join(request, room_id: int):
 @login_required
 @api_view(["DELETE"])
 def left(request, room_id: int):
-    ChatRoomJoinService().left_chatroom(request.user, room_id)
-    return Response()
-
-
-@login_required
-@api_view(["GET"])
-def user_state(request, room_id: int, user_id: int):
+    ChatRoomJoinService().left_chatroom(request.user.id, room_id)
     return Response()
 
 

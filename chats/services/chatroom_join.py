@@ -2,6 +2,7 @@ from datetime import datetime
 
 import jwt
 import pytz
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 
@@ -38,7 +39,8 @@ class ChatRoomJoinService:
 
         return self._make_jwt(now)
 
-    def left_chatroom(self, user: User, room_id: int) -> None:
+    def left_chatroom(self, user_id: int, room_id: int) -> None:
+        user = User.objects.get(pk=user_id)
         now = datetime.now(tz=pytz.UTC)
         chatroom = ChatRoom.objects.get(id=room_id)
 
@@ -58,6 +60,9 @@ class ChatRoomJoinService:
             "left",
             now.timestamp(),
         )
+
+    async def async_left_chatroom(self, user_id: int, room_id: int) -> None:
+        await sync_to_async(self.left_chatroom)(user_id, room_id)
 
     def _make_jwt(self, now: datetime) -> str:
         payload = {"iss": "chatserver", "exp": now.timestamp()}
