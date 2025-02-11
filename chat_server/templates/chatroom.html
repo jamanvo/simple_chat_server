@@ -32,8 +32,22 @@
     </div>
 
     <script>
-        let ws = null;         // 웹소켓 객체
-        let currentRoomId = null;  // 현재 접속 중인 채팅방 ID
+        let ws = null;
+        let currentRoomId = null;
+        let token = null;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch(`/chats/token/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                token = data.token;
+            })
+        });
 
         document.querySelector('#chat-message-submit').onclick = function(e) {
             const messageInputDom = document.querySelector('#chat-message-input');
