@@ -8,15 +8,13 @@ from django.contrib.auth.models import User
 
 from chats.constants import CHATJOINUSER_STATUS_JOINED, CHATJOINUSER_STATUS_LEFT
 from chats.models import ChatRoom, ChatJoinUser
-from chats.services.chat_log import ChatLogService
 
 
-class ChatRoomJoinService:
+class ChatRoomJoinDomain:
     def __init__(self):
         self.redis = settings.REDIS
-        self.chatlog_service = ChatLogService()
 
-    def join_chatroom(self, user: User, room_id: int) -> str | None:
+    def join_chatroom(self, user: User, room_id: int, now: datetime) -> str | None:
         now = datetime.now(tz=pytz.UTC)
 
         if ChatJoinUser.objects.filter(user=user, chatroom_id=room_id, status=CHATJOINUSER_STATUS_JOINED).exists():
@@ -31,15 +29,10 @@ class ChatRoomJoinService:
         chatroom.incr_count()
 
         ChatJoinUser.objects.create(chatroom=chatroom, user=user, joined_at=now)
-        self.chatlog_service.add_state_log(
-            {"user_id": user.id, "room_id": room_id},
-            "join",
-            now.timestamp(),
-        )
 
         return self._make_jwt(now)
 
-    def left_chatroom(self, user_id: int, room_id: int) -> None:
+    def left_chatroom(self, user_id: int, room_id: int, now: datetime) -> None:
         user = User.objects.get(pk=user_id)
         now = datetime.now(tz=pytz.UTC)
         chatroom = ChatRoom.objects.get(id=room_id)
@@ -55,19 +48,11 @@ class ChatRoomJoinService:
             status=CHATJOINUSER_STATUS_LEFT,
             left_at=now,
         )
-        self.chatlog_service.add_state_log(
-            {"user_id": user.id, "room_id": room_id},
-            "left",
-            now.timestamp(),
-        )
 
     async def async_left_chatroom(self, user_id: int, room_id: int) -> None:
-        await sync_to_async(self.left_chatroom)(user_id, room_id)
+        now = datetime.now(tz=pytz.UTC)
+        await sync_to_async(self.left_chatroom)(user_id, room_id, now)
 
     def _make_jwt(self, now: datetime) -> str:
         payload = {"iss": "chatserver", "exp": now.timestamp()}
         return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
-
-    def reset_join_count(self, room_id: int):
-        chatroom = ChatRoom.objects.get(id=room_id)
-        self.redis.set(chatroom.join_count_redis_key, 0)

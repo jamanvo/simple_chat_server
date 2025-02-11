@@ -3,16 +3,16 @@ import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from chats.services.chat_log import ChatLogService
-from chats.services.chatroom_join import ChatRoomJoinService
+from chats.services.domain.chatroom_join import ChatRoomJoinDomain
+from chats.services.domain.message import ChatMessageDomain
 
 
-class ChatConsumer(AsyncWebsocketConsumer):
+class ChatConsumerApplication(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.chatroom_group = ""
-        self.chatlog_service = ChatLogService()
-        self.chat_join_service = ChatRoomJoinService()
+        self.message_service = ChatMessageDomain()
+        self.chat_join_service = ChatRoomJoinDomain()
         self.user_id = None
         self.room_id = None
 
@@ -46,10 +46,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         ts = datetime.datetime.now(datetime.UTC).timestamp()
-        await self.chatlog_service.add_message(data, ts)
+        await self.message_service.add_message(data, ts)
 
-        send_message = dict(**data, **{"type": "chat_message"})
-        await self.channel_layer.group_send(self.chatroom_group, send_message)
+        await self.channel_layer.group_send(self.chatroom_group, data)
 
     async def set_auth(self, data: dict):
         self.user_id = data["user_id"]

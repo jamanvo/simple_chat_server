@@ -3,20 +3,20 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from chats.services.chatroom_join import ChatRoomJoinService
+from chats.services.application.chat_join import ChatRoomJoinApplication
 
 
 @login_required
 @api_view(["POST"])
 def join(request, room_id: int):
-    data = ChatRoomJoinService().join_chatroom(request.user, room_id)
+    data = ChatRoomJoinApplication().join_chatroom(request.user, room_id)
     return Response({"token": data})
 
 
 @login_required
 @api_view(["DELETE"])
 def left(request, room_id: int):
-    ChatRoomJoinService().left_chatroom(request.user.id, room_id)
+    ChatRoomJoinApplication().left_chatroom(request.user.id, room_id)
     return Response()
 
 
